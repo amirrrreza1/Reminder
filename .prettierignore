@@ -1,0 +1,9 @@
+node_modules
+.next
+dist
+coverage
+pnpm-lock.yaml
+playwright-report
+test-results
+backups
+*.min.js

@@ -1,0 +1,31 @@
+{
+  "name": "reminder",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Self-hosted recurring reminder dashboard with email and Telegram notifications",
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @reminder/web dev",
+    "dev:worker": "pnpm --filter @reminder/worker dev",
+    "build": "pnpm -r --filter=./packages/* build && pnpm --filter @reminder/web build && pnpm --filter @reminder/worker build",
+    "start": "pnpm --filter @reminder/web start",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "pnpm --filter @reminder/db migrate",
+    "clean": "pnpm -r --if-present clean && rimraf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.0",
+    "prettier": "^3.6.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
