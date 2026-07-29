@@ -1,0 +1,39 @@
+{
+  "name": "@reminder/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "reminder-migrate": "./dist/migrate-cli.js"
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --max-warnings=0",
+    "clean": "rimraf dist",
+    "migrate": "tsx src/migrate-cli.ts"
+  },
+  "dependencies": {
+    "@reminder/config": "workspace:*",
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "@reminder/eslint-config": "workspace:*",
+    "@reminder/typescript-config": "workspace:*",
+    "@types/node": "^24.2.0",
+    "eslint": "^9.32.0",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2"
+  }
+}
