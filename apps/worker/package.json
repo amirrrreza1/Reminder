@@ -1,0 +1,30 @@
+{
+  "name": "@reminder/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --max-warnings=0",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@reminder/config": "workspace:*",
+    "@reminder/db": "workspace:*",
+    "@reminder/domain": "workspace:*",
+    "@reminder/notifications": "workspace:*",
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "@reminder/eslint-config": "workspace:*",
+    "@reminder/typescript-config": "workspace:*",
+    "@types/node": "^24.2.0",
+    "eslint": "^9.32.0",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2"
+  }
+}
