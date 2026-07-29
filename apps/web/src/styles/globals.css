@@ -1,0 +1,102 @@
+@import "@reminder/ui/styles/tokens.css";
+@import "@reminder/ui/styles/base.css";
+@import "@reminder/ui/styles/components.css";
+
+:root {
+  --font-sans: var(--font-geist-sans), "Geist Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: var(--header-height);
+  padding-inline: var(--space-4);
+  background: var(--color-canvas);
+  border-block-end: var(--border-strong);
+}
+
+@media (min-width: 768px) {
+  .app-header {
+    padding-inline: var(--space-6);
+  }
+}
+
+@media (min-width: 1100px) {
+  .app-header {
+    padding-inline: var(--space-8);
+  }
+}
+
+.app-brand {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-decoration: none;
+}
+
+.app-brand-accent {
+  color: var(--color-accent);
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.app-main {
+  width: min(100% - 2rem, var(--content-max));
+  margin-inline: auto;
+  padding-block: var(--space-8) var(--space-16);
+}
+
+.app-hero {
+  display: grid;
+  gap: var(--space-4);
+  margin-block-end: var(--space-8);
+}
+
+.app-hero h1 {
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  max-inline-size: 18ch;
+}
+
+.app-hero p {
+  color: var(--color-ink-muted);
+  max-inline-size: 42ch;
+}
+
+.app-panel {
+  background: var(--color-surface);
+  border: var(--border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-6);
+  display: grid;
+  gap: var(--space-4);
+  max-inline-size: 36rem;
+}
+
+.app-panel h2 {
+  font-size: 1.25rem;
+  font-weight: 750;
+}
+
+.app-panel p {
+  color: var(--color-ink-muted);
+}
