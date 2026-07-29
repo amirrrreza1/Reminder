@@ -1,0 +1,51 @@
+:root {
+  --color-canvas: #fffdf8;
+  --color-surface: #fff4da;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #ebdbb7;
+  --color-ink: #18181b;
+  --color-ink-muted: #52525b;
+  --color-ink-subtle: #71717a;
+  --color-accent: #d31611;
+  --color-accent-hover: #b81410;
+  --color-warm-hover: #ffc480;
+  --color-success: #16794a;
+  --color-warning: #9a5b00;
+  --color-info: #145da0;
+  --color-disabled: #d4d4d8;
+  --color-overlay: rgba(24, 24, 27, 0.56);
+  --color-divider: #e4e4e7;
+
+  --font-sans: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  --radius-control: 0.25rem;
+  --radius-chip: 0.375rem;
+  --radius-card: 0.75rem;
+
+  --border-strong: 3px solid var(--color-ink);
+  --border-subtle: 1px solid var(--color-divider);
+
+  --shadow-control: 4px 4px 0 var(--color-ink);
+  --shadow-card: 8px 8px 0 var(--color-ink);
+
+  --focus-ring: 0 0 0 3px var(--color-canvas), 0 0 0 6px var(--color-accent);
+
+  --motion-fast: 120ms;
+  --motion-modal: 160ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --content-max: 75rem;
+  --header-height: 4rem;
+}

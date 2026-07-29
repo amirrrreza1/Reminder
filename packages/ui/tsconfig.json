@@ -1,0 +1,11 @@
+{
+  "extends": "@reminder/typescript-config/react-library.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "verbatimModuleSyntax": false
+  },
+  "include": ["src"]
+}
