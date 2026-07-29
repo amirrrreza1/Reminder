@@ -1,0 +1,32 @@
+# Dependencies and build output
+node_modules/
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and local state
+*.log
+*.pid
+.turbo/
+.cache/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Generated local certificates and backups
+*.pem
+*.key
+backups/
+
+# Docker
+*.tar
