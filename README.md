@@ -2,7 +2,7 @@
 
 Reminder is a small, self-hosted application for recurring events and obligations: birthdays, subscriptions, installments, rent, bills, insurance renewals, maintenance, and custom cycles. It keeps the product surface intentionally narrow: one dashboard, one add/edit modal, and one settings modal.
 
-> **Project status:** Phase 1 foundation is implemented. The pnpm workspace, Next.js shell, worker placeholder, Compose stack, and CI pipeline are runnable. Domain logic, reminder CRUD, and live notifications arrive in later phases.
+> **Project status:** Phase 2 domain and persistence is implemented. Gregorian/Jalali recurrence, money handling, PostgreSQL schema and migrations, optimistic-concurrency reminder/settings APIs, and PostgreSQL integration tests are runnable. Dashboard UX and live notification delivery arrive in later phases.
 
 ## MVP at a glance
 

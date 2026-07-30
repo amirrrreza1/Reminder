@@ -25,6 +25,8 @@
   },
   "dependencies": {
     "@reminder/config": "workspace:*",
+    "@reminder/domain": "workspace:*",
+    "drizzle-orm": "^0.44.4",
     "postgres": "^3.4.7"
   },
   "devDependencies": {

@@ -20,7 +20,8 @@
     "lucide-react": "^0.536.0",
     "next": "^15.4.5",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@reminder/eslint-config": "workspace:*",

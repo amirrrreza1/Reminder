@@ -4,12 +4,26 @@ import { fileURLToPath } from "node:url";
 
 import postgres from "postgres";
 
+export * from "./schema.js";
+export * from "./repository.js";
+
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = path.join(packageRoot, "migrations");
 
 export type MigrationResult = {
   applied: string[];
   alreadyApplied: string[];
+};
+
+export type SettingsDefaults = {
+  calendarSystem: "gregorian" | "jalali";
+  defaultCurrency: "IRR" | "USD";
+  emailEnabled: boolean;
+  telegramEnabled: boolean;
+};
+
+export type PersistedSettings = SettingsDefaults & {
+  updatedAt: Date;
 };
 
 export async function createSql(databaseUrl: string) {
@@ -87,6 +101,43 @@ export async function areMigrationsCurrent(databaseUrl: string): Promise<boolean
     return files.every((file) => appliedSet.has(file));
   } catch {
     return false;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/** Inserts the singleton exactly once; subsequent starts preserve user edits. */
+export async function ensureSettings(
+  databaseUrl: string,
+  defaults: SettingsDefaults,
+): Promise<PersistedSettings> {
+  const sql = await createSql(databaseUrl);
+  try {
+    await sql`
+      insert into settings (id, calendar_system, default_currency, email_enabled, telegram_enabled)
+      values (1, ${defaults.calendarSystem}, ${defaults.defaultCurrency}, ${defaults.emailEnabled}, ${defaults.telegramEnabled})
+      on conflict (id) do nothing
+    `;
+    const rows = await sql<
+      {
+        calendar_system: SettingsDefaults["calendarSystem"];
+        default_currency: SettingsDefaults["defaultCurrency"];
+        email_enabled: boolean;
+        telegram_enabled: boolean;
+        updated_at: Date;
+      }[]
+    >`
+      select calendar_system, default_currency, email_enabled, telegram_enabled, updated_at from settings where id = 1
+    `;
+    const row = rows[0];
+    if (!row) throw new Error("Settings singleton was not created.");
+    return {
+      calendarSystem: row.calendar_system,
+      defaultCurrency: row.default_currency,
+      emailEnabled: row.email_enabled,
+      telegramEnabled: row.telegram_enabled,
+      updatedAt: row.updated_at,
+    };
   } finally {
     await sql.end({ timeout: 5 });
   }

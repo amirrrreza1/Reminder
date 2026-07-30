@@ -1,11 +1,8 @@
-/**
- * Shared domain types for Phase 1 scaffolding.
- * Calendar, recurrence, and money logic land in Phase 2.
- */
-
-export type CalendarSystem = "gregorian" | "jalali";
-
-export type CurrencyCode = "IRR" | "USD";
+export * from "./calendar.js";
+export * from "./money.js";
+export * from "./recurrence.js";
+export * from "./reminder.js";
+export * from "./types.js";
 
 export const APP_NAME = "Reminder" as const;
 

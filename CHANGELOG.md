@@ -6,6 +6,9 @@ All notable changes will be documented here. The format follows [Keep a Changelo
 
 ### Added
 
+- Phase 2 domain and persistence: Gregorian/Jalali calendar and recurrence logic, exact money parsing, reviewed PostgreSQL schema, and singleton settings seeding.
+- Reminder and settings JSON APIs with validation, provider availability gates, optimistic concurrency, and cursor-paginated list responses.
+- PostgreSQL integration coverage for clean migrations and reminder CRUD/stale-write behavior.
 - Phase 1 repository and container foundation: pnpm workspace, shared packages, Next.js shell, worker placeholder, multi-stage Dockerfile, Compose stack, and CI.
 - Validated environment configuration with a secret-free client projection.
 - Foundation SQL migration and migration CLI.

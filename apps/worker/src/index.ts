@@ -20,10 +20,10 @@ async function writeHeartbeat(databaseUrl: string): Promise<void> {
   const sql = await createSql(databaseUrl);
   try {
     await sql`
-      insert into worker_heartbeats (worker_id, updated_at)
-      values (${WORKER_ID}, now())
+      insert into worker_heartbeats (worker_id, role, started_at, last_seen_at, updated_at)
+      values (${WORKER_ID}, 'scheduler_delivery', now(), now(), now())
       on conflict (worker_id)
-      do update set updated_at = excluded.updated_at
+      do update set last_seen_at = excluded.last_seen_at, updated_at = excluded.updated_at
     `;
   } finally {
     await sql.end({ timeout: 5 });

@@ -12,6 +12,10 @@
   "files": [
     "dist"
   ],
+  "dependencies": {
+    "jalaali-js": "^1.2.8",
+    "zod": "^3.25.76"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -22,6 +26,7 @@
   "devDependencies": {
     "@reminder/eslint-config": "workspace:*",
     "@reminder/typescript-config": "workspace:*",
+    "@types/jalaali-js": "^1.2.0",
     "eslint": "^9.32.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.9.2",

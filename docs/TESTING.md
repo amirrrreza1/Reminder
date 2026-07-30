@@ -203,6 +203,8 @@ No critical or serious automated accessibility violation may be waived without a
 
 ## 8. Visual regression set
 
+The checked-in Phase 3 Playwright suite uses fixed synthetic API fixtures, UTC, `en-US`, reduced motion, and local fonts. It covers the populated dashboard at desktop and 360 px; changes to its approved PNG baselines require review.
+
 Capture deterministic screenshots with fixed time, timezone, locale, fonts, data, and animation disabled:
 
 - desktop dashboard: populated, empty, loading, background error;

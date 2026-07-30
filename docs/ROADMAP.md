@@ -31,6 +31,8 @@ Exit:
 
 ## Phase 2 — Domain and persistence
 
+Status: complete.
+
 - Calendar adapter and independent trusted fixtures.
 - Gregorian/Jalali recurrence, month-end, leap, timezone, and notification-time logic (`REC-*`).
 - Money parsing/formatting and type presets.
@@ -46,6 +48,8 @@ Exit:
 - Migration and integrity commands pass from a clean database.
 
 ## Phase 3 — Dashboard and modal UX
+
+Status: complete.
 
 - Header, summary, toolbar, responsive reminder-card grid (`DASH-*`).
 - Add/edit reminder modal with schedule preview, dirty-close protection, pause/resume, and delete (`REM-*`).

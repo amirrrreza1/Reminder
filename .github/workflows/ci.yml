@@ -74,11 +74,82 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  integration:
+    name: PostgreSQL integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [static]
+    services:
+      postgres:
+        image: postgres:17.5-bookworm
+        env:
+          POSTGRES_DB: reminder_test
+          POSTGRES_USER: reminder
+          POSTGRES_PASSWORD: reminder
+        options: >-
+          --health-cmd "pg_isready -U reminder -d reminder_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run repository integration tests
+        run: pnpm test
+        env:
+          TEST_DATABASE_URL: postgresql://reminder:reminder@localhost:5432/reminder_test
+
+  ui:
+    name: Dashboard accessibility and visual tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [static]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run dashboard tests
+        run: pnpm test:ui
+
   image:
     name: Image build and scan
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [static]
+    needs: [static, integration, ui]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -20,7 +20,11 @@ COPY packages/notifications/package.json packages/notifications/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/eslint-config/package.json packages/eslint-config/package.json
 COPY packages/typescript-config/package.json packages/typescript-config/package.json
-RUN pnpm install --frozen-lockfile
+# The builder compiles every workspace package, so dev dependencies (including
+# TypeScript) must be installed even when the host sets NODE_ENV=production.
+# The builder compiles every workspace package, so dev dependencies (including
+# TypeScript) must be installed even when the host sets NODE_ENV=production.
+RUN pnpm install --frozen-lockfile --prod=false
 
 FROM deps AS builder
 COPY . .
@@ -48,6 +52,8 @@ RUN apt-get update \
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
+# The web readiness route checks the applied migration ledger against these files.
+COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
 COPY --from=builder /deploy/worker ./runtime/worker
 COPY --from=builder /deploy/db ./runtime/db
 COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
