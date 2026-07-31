@@ -56,7 +56,7 @@ services:
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "${APP_PORT:-1234}:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
