@@ -2,7 +2,7 @@
 
 Reminder is a small, self-hosted application for recurring events and obligations: birthdays, subscriptions, installments, rent, bills, insurance renewals, maintenance, and custom cycles. It keeps the product surface intentionally narrow: one dashboard, one add/edit modal, and one settings modal.
 
-> **Project status:** Phase 2 domain and persistence is implemented. Gregorian/Jalali recurrence, money handling, PostgreSQL schema and migrations, optimistic-concurrency reminder/settings APIs, and PostgreSQL integration tests are runnable. Dashboard UX and live notification delivery arrive in later phases.
+> **Project status:** Phase 4 notification delivery is implemented. The dashboard, durable PostgreSQL scheduler/queue, SMTP and Telegram adapters, retries, lease recovery, and asynchronous provider tests are runnable. Operations and release hardening remain in Phase 5.
 
 ## MVP at a glance
 

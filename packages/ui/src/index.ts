@@ -10,5 +10,6 @@ export {
   DialogTrigger,
 } from "./components/dialog";
 export { Switch } from "./components/switch";
+export { Select, type SelectOption, type SelectProps } from "./components/select";
 export { Tooltip, TooltipProvider } from "./components/tooltip";
 export { cn } from "./lib/cn";

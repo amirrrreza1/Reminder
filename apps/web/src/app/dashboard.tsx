@@ -11,7 +11,6 @@ import {
   Plus,
   Search,
   Settings,
-  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -24,9 +23,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Select,
   Switch,
 } from "@reminder/ui";
-import { createReminderSchema } from "@reminder/domain";
+import { createReminderSchema, reminderPresets } from "@reminder/domain";
 
 type CalendarSystem = "gregorian" | "jalali";
 type Currency = "IRR" | "USD";
@@ -73,6 +73,13 @@ type SettingsRecord = {
   telegramEnabled: boolean;
   updatedAt: string;
   providers: { email: Provider; telegram: Provider };
+};
+type ProviderTest = {
+  id: string;
+  channel: "email" | "telegram";
+  status: "pending" | "processing" | "retry" | "sent" | "failed" | "expired";
+  attemptCount: number;
+  error: { message: string } | null;
 };
 type ListResponse = {
   items: Reminder[];
@@ -127,19 +134,47 @@ const typeLabels: Record<ReminderType, string> = {
   tax_license: "Tax / license",
   custom: "Custom",
 };
-const presets: Record<ReminderType, { frequency: Frequency; interval: number; amount: boolean }> = {
-  birthday: { frequency: "yearly", interval: 1, amount: false },
-  subscription: { frequency: "monthly", interval: 1, amount: true },
-  debt: { frequency: "monthly", interval: 1, amount: true },
-  rent: { frequency: "monthly", interval: 1, amount: true },
-  bill: { frequency: "monthly", interval: 1, amount: true },
-  insurance: { frequency: "yearly", interval: 1, amount: true },
-  membership: { frequency: "yearly", interval: 1, amount: true },
-  maintenance: { frequency: "monthly", interval: 3, amount: false },
-  medication_refill: { frequency: "monthly", interval: 1, amount: false },
-  tax_license: { frequency: "yearly", interval: 1, amount: true },
-  custom: { frequency: "monthly", interval: 1, amount: false },
+const currencyLabels: Record<Currency, string> = {
+  IRR: "Iranian rial (IRR)",
+  USD: "US dollar (USD)",
 };
+const gregorianMonthLabels = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const jalaliMonthLabels = [
+  "Farvardin",
+  "Ordibehesht",
+  "Khordad",
+  "Tir",
+  "Mordad",
+  "Shahrivar",
+  "Mehr",
+  "Aban",
+  "Azar",
+  "Dey",
+  "Bahman",
+  "Esfand",
+];
+const frequencyOptions = ["once", "daily", "weekly", "monthly", "yearly"].map((value) => ({
+  value,
+  label: value.charAt(0).toUpperCase() + value.slice(1),
+}));
+
+function monthOptions(calendar: CalendarSystem) {
+  const labels = calendar === "jalali" ? jalaliMonthLabels : gregorianMonthLabels;
+  return labels.map((label, index) => ({ value: String(index + 1), label }));
+}
 
 function apiError(payload: unknown): { message: string; code: string | null; meta: unknown } {
   if (typeof payload === "object" && payload && "error" in payload) {
@@ -227,6 +262,16 @@ function countdown(iso: string | null): string {
   return `in ${days} ${days === 1 ? "day" : "days"}`;
 }
 
+function todayInCalendar(calendar: CalendarSystem): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat(
+    calendar === "jalali" ? "en-US-u-ca-persian" : "en-US-u-ca-gregory",
+    { day: "numeric", month: "numeric", year: "numeric" },
+  ).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+  return { year: value("year"), month: value("month"), day: value("day") };
+}
+
 function recurrenceLabel(schedule: Reminder["schedule"]): string {
   const unit =
     schedule.frequency === "once"
@@ -237,17 +282,18 @@ function recurrenceLabel(schedule: Reminder["schedule"]): string {
 }
 
 function initialDraft(settings: SettingsRecord | null): Draft {
-  const today = new Date();
+  const calendar = settings?.calendarSystem ?? "gregorian";
+  const today = todayInCalendar(calendar);
   return {
     title: "",
     description: "",
     type: "custom",
     customTypeLabel: "",
     state: "active",
-    calendar: settings?.calendarSystem ?? "gregorian",
-    year: String(today.getFullYear()),
-    month: String(today.getMonth() + 1),
-    day: String(today.getDate()),
+    calendar,
+    year: String(today.year),
+    month: String(today.month),
+    day: String(today.day),
     frequency: "monthly",
     interval: "1",
     amount: "",
@@ -258,7 +304,7 @@ function initialDraft(settings: SettingsRecord | null): Draft {
   };
 }
 
-function draftFromReminder(reminder: Reminder): Draft {
+function draftFromReminder(reminder: Reminder, settings: SettingsRecord | null): Draft {
   return {
     title: reminder.title,
     description: reminder.description ?? "",
@@ -272,7 +318,7 @@ function draftFromReminder(reminder: Reminder): Draft {
     frequency: reminder.schedule.frequency,
     interval: String(reminder.schedule.interval),
     amount: amountForInput(reminder.amount),
-    currency: reminder.amount?.currency ?? "IRR",
+    currency: reminder.amount?.currency ?? settings?.defaultCurrency ?? "IRR",
     remindBeforeDays: String(reminder.remindBeforeDays),
     email: reminder.channels.email,
     telegram: reminder.channels.telegram,
@@ -372,6 +418,8 @@ export function Dashboard() {
   const saveReminder = async (draft: Draft, editing: Reminder | null) => {
     if (offline || mutationsBlocked)
       throw new Error("You’re offline. Reconnect before saving changes.");
+    const reminderCalendar = editing?.schedule.calendar ?? settings?.calendarSystem ?? "gregorian";
+    const reminderCurrency = editing?.amount?.currency ?? settings?.defaultCurrency ?? "IRR";
     const body = {
       title: draft.title,
       description: draft.description || null,
@@ -379,7 +427,7 @@ export function Dashboard() {
       customTypeLabel: draft.type === "custom" ? draft.customTypeLabel || null : null,
       state: draft.state,
       schedule: {
-        calendar: draft.calendar,
+        calendar: reminderCalendar,
         anchorDate: {
           year: Number(draft.year),
           month: Number(draft.month),
@@ -388,7 +436,9 @@ export function Dashboard() {
         frequency: draft.frequency,
         interval: Number(draft.interval),
       },
-      amount: parseAmount(draft.amount, draft.currency),
+      amount: reminderPresets[draft.type].amountVisible
+        ? parseAmount(draft.amount, reminderCurrency)
+        : null,
       remindBeforeDays: Number(draft.remindBeforeDays),
       channels: { email: draft.email, telegram: draft.telegram },
     };
@@ -432,6 +482,23 @@ export function Dashboard() {
       throw cause;
     }
   };
+  const sendProviderTest = async (channel: "email" | "telegram"): Promise<string> => {
+    if (offline || mutationsBlocked)
+      throw new Error("Youâ€™re offline. Reconnect before sending a test message.");
+    const accepted = await request<{ statusUrl: string }>(`/api/v1/provider-tests/${channel}`, {
+      method: "POST",
+      body: JSON.stringify({ confirmed: true }),
+    });
+    const delays = [400, 800, 1_600, 3_200, 5_000];
+    for (const delay of delays) {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, delay));
+      const test = await request<ProviderTest>(accepted.statusUrl);
+      if (test.status === "sent") return `${channel === "email" ? "Email" : "Telegram"} test sent.`;
+      if (["failed", "expired"].includes(test.status))
+        throw new Error(test.error?.message ?? "The provider could not send the test message.");
+    }
+    return "Test message queued. It may take a moment to arrive.";
+  };
   const openReminder = (value: Reminder | "new") => {
     setReminderModal(value);
     updateUrl({ modal: "reminder", id: value === "new" ? null : value.id });
@@ -451,27 +518,7 @@ export function Dashboard() {
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <a href="/" className="app-brand" aria-label="Reminder home">
-          Reminde<span className="app-brand-accent">r</span>
-        </a>
-        <div className="app-header-actions">
-          <Button variant="secondary" onClick={openSettings} aria-label="Open settings">
-            <Settings aria-hidden="true" size={18} />
-            <span>Settings</span>
-          </Button>
-          <Button variant="primary" onClick={() => openReminder("new")}>
-            <Plus aria-hidden="true" size={18} />
-            Add reminder
-          </Button>
-        </div>
-      </header>
       <main className="app-main">
-        <section className="dashboard-intro" aria-labelledby="page-title">
-          <p className="eyebrow">Your recurring essentials</p>
-          <h1 id="page-title">Never miss what comes around.</h1>
-          <p>Track dates, amounts, and reminders in one calm place.</p>
-        </section>
         {notice && (
           <p className="sr-only" role="status">
             {notice}
@@ -509,44 +556,69 @@ export function Dashboard() {
             loading={loading}
           />
         </section>
-        <section className="toolbar" aria-label="Reminder controls">
-          <label className="search-field">
-            <Search aria-hidden="true" size={18} />
-            <span className="sr-only">Search reminders</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search reminders"
-            />
-          </label>
-          <label>
-            <span className="sr-only">Filter by type</span>
-            <select value={type} onChange={(event) => setType(event.target.value)}>
-              <option value="">All types</option>
-              {Object.entries(typeLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="sr-only">Filter by state</span>
-            <select value={state} onChange={(event) => setState(event.target.value)}>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="completed">Completed</option>
-              <option value="all">All states</option>
-            </select>
-          </label>
-          <label>
-            <span className="sr-only">Sort reminders</span>
-            <select value={sort} onChange={(event) => setSort(event.target.value)}>
-              <option value="nextOccurrence">Next occurrence</option>
-              <option value="title">Title</option>
-              <option value="amount">Amount</option>
-            </select>
-          </label>
+        <section className="dashboard-controls" aria-label="Reminder controls">
+          <div className="dashboard-actions">
+            <Button variant="secondary" onClick={openSettings} aria-label="Open settings">
+              <Settings aria-hidden="true" size={18} />
+              <span>Settings</span>
+            </Button>
+            <Button variant="primary" onClick={() => openReminder("new")}>
+              <Plus aria-hidden="true" size={18} />
+              Add reminder
+            </Button>
+          </div>
+          <div className="toolbar">
+            <label className="toolbar-field toolbar-field--search">
+              Search
+              <span className="search-field">
+                <Search aria-hidden="true" size={18} />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search by title or notes"
+                />
+              </span>
+            </label>
+            <label className="toolbar-field">
+              Type
+              <Select
+                aria-label="Type"
+                value={type || "all"}
+                onValueChange={(value) => setType(value === "all" ? "" : value)}
+                options={[
+                  { value: "all", label: "All types" },
+                  ...Object.entries(typeLabels).map(([value, label]) => ({ value, label })),
+                ]}
+              />
+            </label>
+            <label className="toolbar-field">
+              State
+              <Select
+                aria-label="State"
+                value={state}
+                onValueChange={setState}
+                options={[
+                  { value: "active", label: "Active" },
+                  { value: "paused", label: "Paused" },
+                  { value: "completed", label: "Completed" },
+                  { value: "all", label: "All states" },
+                ]}
+              />
+            </label>
+            <label className="toolbar-field">
+              Sort
+              <Select
+                aria-label="Sort"
+                value={sort}
+                onValueChange={setSort}
+                options={[
+                  { value: "nextOccurrence", label: "Next occurrence" },
+                  { value: "title", label: "Title" },
+                  { value: "amount", label: "Amount" },
+                ]}
+              />
+            </label>
+          </div>
         </section>
         {loading ? (
           <div className="card-grid" aria-label="Loading reminders">
@@ -613,6 +685,7 @@ export function Dashboard() {
           if (!open) closeSettings();
         }}
         onSave={saveSettings}
+        onProviderTest={sendProviderTest}
         mutationsBlocked={offline || mutationsBlocked}
       />
     </div>
@@ -682,15 +755,13 @@ function ReminderCard({
       <div className="card-footer">
         <div className="channel-list" aria-label="Notification channels">
           {reminder.channels.email && (
-            <span title="Email enabled">
+            <span role="img" aria-label="Email enabled" title="Email enabled">
               <Mail aria-hidden="true" size={16} />
-              Email
             </span>
           )}
           {reminder.channels.telegram && (
-            <span title="Telegram enabled">
+            <span role="img" aria-label="Telegram enabled" title="Telegram enabled">
               <MessageCircle aria-hidden="true" size={16} />
-              Telegram
             </span>
           )}
           {!reminder.channels.email && !reminder.channels.telegram && <span>No channels</span>}
@@ -701,6 +772,50 @@ function ReminderCard({
         </Button>
       </div>
     </article>
+  );
+}
+
+function ConfirmationModal({
+  open,
+  title,
+  description,
+  confirmLabel,
+  destructive = false,
+  confirmDisabled = false,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  destructive?: boolean;
+  confirmDisabled?: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="confirmation-dialog">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="secondary" type="button" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant={destructive ? "destructive" : "primary"}
+            type="button"
+            onClick={onConfirm}
+            disabled={confirmDisabled}
+          >
+            {confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -731,7 +846,7 @@ function ReminderModal({
   const [conflict, setConflict] = useState<Reminder | null>(null);
   const [preview, setPreview] = useState<SchedulePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [scheduleTouched, setScheduleTouched] = useState({ frequency: false, interval: false });
+  const [confirmation, setConfirmation] = useState<"discard" | "delete" | null>(null);
   const initialized = useRef(false);
   useEffect(() => {
     if (!open) {
@@ -739,20 +854,22 @@ function ReminderModal({
       return;
     }
     if (initialized.current) return;
-    const next = reminder ? draftFromReminder(reminder) : initialDraft(settings);
+    const next = reminder ? draftFromReminder(reminder, settings) : initialDraft(settings);
     setDraft(next);
     setInitial(JSON.stringify(next));
     setCurrentReminder(reminder);
     setError(null);
     setConflict(null);
-    setScheduleTouched({ frequency: false, interval: false });
     initialized.current = true;
   }, [open, reminder, settings]);
   const dirty = JSON.stringify(draft) !== initial;
   const change = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
   const close = (nextOpen: boolean) => {
-    if (!nextOpen && dirty && !window.confirm("Discard your unsaved changes?")) return;
+    if (!nextOpen && dirty) {
+      setConfirmation("discard");
+      return;
+    }
     onOpenChange(nextOpen);
   };
   useEffect(() => {
@@ -825,12 +942,12 @@ function ReminderModal({
       setSaving(false);
     }
   };
+  const requestDelete = () => {
+    if (currentReminder) setConfirmation("delete");
+  };
   const deleteReminder = async () => {
-    if (
-      !currentReminder ||
-      !window.confirm(`Delete ${currentReminder.title}? This cannot be undone.`)
-    )
-      return;
+    if (!currentReminder) return;
+    setConfirmation(null);
     setSaving(true);
     setError(null);
     try {
@@ -847,278 +964,273 @@ function ReminderModal({
     }
   };
   const typeChange = (value: ReminderType) => {
-    const preset = presets[value];
+    const preset = reminderPresets[value];
     setDraft((current) => {
-      if (currentReminder) return { ...current, type: value };
       return {
         ...current,
         type: value,
-        frequency: scheduleTouched.frequency ? current.frequency : preset.frequency,
-        interval: scheduleTouched.interval ? current.interval : String(preset.interval),
+        frequency: preset.frequency,
+        interval: String(preset.interval),
+        amount: preset.amountVisible ? current.amount : "",
+        state: current.state === "completed" ? "active" : current.state,
       };
     });
   };
   return (
-    <Dialog open={open} onOpenChange={close}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{currentReminder ? "Edit reminder" : "Add reminder"}</DialogTitle>
-          <DialogDescription>
-            Dates use the selected schedule calendar. The recurrence keeps that calendar even if
-            display settings change.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={save} className="form-grid">
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
-          {conflict && (
-            <div className="form-error form-error--conflict" role="alert">
-              This reminder was changed elsewhere. Reload the latest version before saving.
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  const next = draftFromReminder(conflict);
-                  setCurrentReminder(conflict);
-                  setDraft(next);
-                  setInitial(JSON.stringify(next));
-                  setConflict(null);
-                  setError(null);
-                }}
-              >
-                Reload latest
-              </Button>
-            </div>
-          )}
-          <label className="field field--wide">
-            Title
-            <input
-              required
-              maxLength={120}
-              value={draft.title}
-              onChange={(event) => change("title", event.target.value)}
-              autoFocus
-            />
-          </label>
-          <label className="field field--wide">
-            Description
-            <textarea
-              maxLength={2000}
-              rows={3}
-              value={draft.description}
-              onChange={(event) => change("description", event.target.value)}
-            />
-          </label>
-          <label className="field">
-            Type
-            <select
-              value={draft.type}
-              onChange={(event) => typeChange(event.target.value as ReminderType)}
-            >
-              {Object.entries(typeLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {draft.type === "custom" && (
-            <label className="field">
-              Custom type label
+    <>
+      <Dialog open={open} onOpenChange={close}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{currentReminder ? "Edit reminder" : "Add reminder"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={save} className="form-grid">
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
+            {conflict && (
+              <div className="form-error form-error--conflict" role="alert">
+                This reminder was changed elsewhere. Reload the latest version before saving.
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    const next = draftFromReminder(conflict, settings);
+                    setCurrentReminder(conflict);
+                    setDraft(next);
+                    setInitial(JSON.stringify(next));
+                    setConflict(null);
+                    setError(null);
+                  }}
+                >
+                  Reload latest
+                </Button>
+              </div>
+            )}
+            <label className="field field--wide">
+              Title
               <input
                 required
-                maxLength={40}
-                value={draft.customTypeLabel}
-                onChange={(event) => change("customTypeLabel", event.target.value)}
+                maxLength={120}
+                value={draft.title}
+                onChange={(event) => change("title", event.target.value)}
+                autoFocus
               />
             </label>
-          )}
-          <fieldset className="field field--wide">
-            <legend>Schedule date</legend>
-            <div className="date-fields">
-              <label>
-                Calendar
-                <select
-                  value={draft.calendar}
-                  onChange={(event) => change("calendar", event.target.value as CalendarSystem)}
-                >
-                  <option value="gregorian">Gregorian</option>
-                  <option value="jalali">Solar Hijri (Jalali)</option>
-                </select>
-              </label>
-              <label>
-                Year
-                <input
-                  required
-                  inputMode="numeric"
-                  value={draft.year}
-                  onChange={(event) => change("year", event.target.value)}
-                />
-              </label>
-              <label>
-                Month
-                <input
-                  required
-                  min="1"
-                  max="12"
-                  type="number"
-                  value={draft.month}
-                  onChange={(event) => change("month", event.target.value)}
-                />
-              </label>
-              <label>
-                Day
-                <input
-                  required
-                  min="1"
-                  max="31"
-                  type="number"
-                  value={draft.day}
-                  onChange={(event) => change("day", event.target.value)}
-                />
-              </label>
-            </div>
-          </fieldset>
-          <label className="field">
-            Repeats
-            <select
-              value={draft.frequency}
-              onChange={(event) => {
-                setScheduleTouched((current) => ({ ...current, frequency: true }));
-                change("frequency", event.target.value as Frequency);
-              }}
-            >
-              {["once", "daily", "weekly", "monthly", "yearly"].map((value) => (
-                <option key={value} value={value}>
-                  {value.charAt(0).toUpperCase() + value.slice(1)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            Interval
-            <input
-              required
-              min="1"
-              max="99"
-              type="number"
-              disabled={draft.frequency === "once"}
-              value={draft.interval}
-              onChange={(event) => {
-                setScheduleTouched((current) => ({ ...current, interval: true }));
-                change("interval", event.target.value);
-              }}
-            />
-          </label>
-          <p className="schedule-preview field--wide">
-            <CalendarDays aria-hidden="true" size={17} />
-            {preview
-              ? `Next occurrence: ${formatDate(preview.nextOccurrenceDate, draft.calendar)}.`
-              : (previewError ?? "Calculating the next occurrence…")}
-          </p>
-          <label className="field">
-            Amount
-            <input
-              inputMode="decimal"
-              value={draft.amount}
-              placeholder={draft.currency === "USD" ? "12.50" : "1,250,000"}
-              onChange={(event) => change("amount", event.target.value.replaceAll(",", ""))}
-            />
-          </label>
-          <label className="field">
-            Currency
-            <select
-              value={draft.currency}
-              onChange={(event) => change("currency", event.target.value as Currency)}
-            >
-              <option value="IRR">Iranian rial (IRR)</option>
-              <option value="USD">US dollar (USD)</option>
-            </select>
-          </label>
-          <label className="field">
-            Remind before (days)
-            <input
-              required
-              min="0"
-              max="365"
-              type="number"
-              value={draft.remindBeforeDays}
-              onChange={(event) => change("remindBeforeDays", event.target.value)}
-            />
-          </label>
-          {currentReminder && (
-            <label className="field">
-              Status
-              <select
-                value={draft.state}
-                onChange={(event) => change("state", event.target.value as ReminderState)}
-              >
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-                {currentReminder.schedule.frequency === "once" && (
-                  <option value="completed">Completed</option>
-                )}
-              </select>
+            <label className="field field--wide">
+              Description
+              <textarea
+                maxLength={2000}
+                rows={3}
+                value={draft.description}
+                onChange={(event) => change("description", event.target.value)}
+              />
             </label>
-          )}
-          <fieldset className="field field--wide">
-            <legend>Notification channels</legend>
-            <div className="channel-toggles">
-              <label>
-                <Switch
-                  checked={draft.email}
-                  onCheckedChange={(value) => change("email", value)}
-                  disabled={!settings?.providers.email.available}
+            <label className="field">
+              Type
+              <Select
+                aria-label="Type"
+                value={draft.type}
+                onValueChange={(value) => typeChange(value as ReminderType)}
+                options={Object.entries(typeLabels).map(([value, label]) => ({ value, label }))}
+              />
+            </label>
+            {draft.type === "custom" && (
+              <label className="field">
+                Custom type label
+                <input
+                  required
+                  maxLength={40}
+                  value={draft.customTypeLabel}
+                  onChange={(event) => change("customTypeLabel", event.target.value)}
                 />
-                Email{" "}
-                {!settings?.providers.email.available && (
-                  <small>Not configured by the server</small>
-                )}
               </label>
-              <label>
-                <Switch
-                  checked={draft.telegram}
-                  onCheckedChange={(value) => change("telegram", value)}
-                  disabled={!settings?.providers.telegram.available}
-                />
-                Telegram{" "}
-                {!settings?.providers.telegram.available && (
-                  <small>Not configured by the server</small>
-                )}
-              </label>
-            </div>
-          </fieldset>
-          <DialogFooter>
-            {currentReminder && (
-              <Button
-                variant="destructive"
-                type="button"
-                onClick={deleteReminder}
-                disabled={saving || mutationsBlocked}
-              >
-                <Trash2 aria-hidden="true" size={17} />
-                Delete reminder
-              </Button>
             )}
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => close(false)}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" disabled={saving || mutationsBlocked}>
-              {saving && <LoaderCircle className="spin" aria-hidden="true" size={17} />}
-              {reminder ? "Save changes" : "Create reminder"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <fieldset className="field field--wide">
+              <legend>Schedule date</legend>
+              <div className="date-fields">
+                <label>
+                  Year
+                  <input
+                    required
+                    inputMode="numeric"
+                    value={draft.year}
+                    onChange={(event) => change("year", event.target.value)}
+                  />
+                </label>
+                <label>
+                  Month
+                  <Select
+                    aria-label="Month"
+                    value={draft.month}
+                    onValueChange={(value) => change("month", value)}
+                    options={monthOptions(draft.calendar)}
+                  />
+                </label>
+                <label>
+                  Day
+                  <input
+                    required
+                    min="1"
+                    max="31"
+                    type="number"
+                    value={draft.day}
+                    onChange={(event) => change("day", event.target.value)}
+                  />
+                </label>
+              </div>
+            </fieldset>
+            <label className="field">
+              Repeats
+              <Select
+                aria-label="Repeats"
+                value={draft.frequency}
+                onValueChange={(value) => change("frequency", value as Frequency)}
+                options={frequencyOptions}
+              />
+            </label>
+            <label className="field">
+              Interval
+              <input
+                required
+                min="1"
+                max="99"
+                type="number"
+                disabled={draft.frequency === "once"}
+                value={draft.interval}
+                onChange={(event) => change("interval", event.target.value)}
+              />
+            </label>
+            <p className="schedule-preview field--wide">
+              <CalendarDays aria-hidden="true" size={17} />
+              {preview
+                ? `Next occurrence: ${formatDate(preview.nextOccurrenceDate, draft.calendar)}.`
+                : (previewError ?? "Calculating the next occurrence…")}
+            </p>
+            {reminderPresets[draft.type].amountVisible && (
+              <label className="field">
+                <span>
+                  Amount{" "}
+                  <span className="field-setting">
+                    ({currencyLabels[draft.currency]}, set in Settings)
+                  </span>
+                </span>
+                <input
+                  inputMode="decimal"
+                  value={draft.amount}
+                  placeholder={draft.currency === "USD" ? "12.50" : "1,250,000"}
+                  onChange={(event) => change("amount", event.target.value.replaceAll(",", ""))}
+                />
+              </label>
+            )}
+            <label className="field">
+              Remind before (days)
+              <input
+                required
+                min="0"
+                max="365"
+                type="number"
+                value={draft.remindBeforeDays}
+                onChange={(event) => change("remindBeforeDays", event.target.value)}
+              />
+            </label>
+            {currentReminder && (
+              <label className="field">
+                Status
+                <Select
+                  aria-label="Status"
+                  value={draft.state}
+                  onValueChange={(value) => change("state", value as ReminderState)}
+                  options={[
+                    { value: "active", label: "Active" },
+                    { value: "paused", label: "Paused" },
+                    ...(draft.frequency === "once"
+                      ? [{ value: "completed", label: "Completed" }]
+                      : []),
+                  ]}
+                />
+              </label>
+            )}
+            <fieldset className="field field--wide">
+              <legend>Notification channels</legend>
+              <div className="channel-toggles">
+                <label>
+                  <Switch
+                    checked={draft.email}
+                    onCheckedChange={(value) => change("email", value)}
+                    disabled={!settings?.providers.email.available}
+                  />
+                  Email{" "}
+                  {!settings?.providers.email.available && (
+                    <small>Not configured by the server</small>
+                  )}
+                </label>
+                <label>
+                  <Switch
+                    checked={draft.telegram}
+                    onCheckedChange={(value) => change("telegram", value)}
+                    disabled={!settings?.providers.telegram.available}
+                  />
+                  Telegram{" "}
+                  {!settings?.providers.telegram.available && (
+                    <small>Not configured by the server</small>
+                  )}
+                </label>
+              </div>
+            </fieldset>
+            <DialogFooter className="field--wide">
+              {currentReminder && (
+                <Button
+                  variant="destructive"
+                  type="button"
+                  onClick={requestDelete}
+                  disabled={saving || mutationsBlocked}
+                >
+                  <Trash2 aria-hidden="true" size={17} />
+                  Delete reminder
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => close(false)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit" disabled={saving || mutationsBlocked}>
+                {saving && <LoaderCircle className="spin" aria-hidden="true" size={17} />}
+                {reminder ? "Save changes" : "Create reminder"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <ConfirmationModal
+        open={confirmation !== null}
+        title={confirmation === "delete" ? "Delete reminder?" : "Discard changes?"}
+        description={
+          confirmation === "delete"
+            ? `Delete ${currentReminder?.title ?? "this reminder"}? This cannot be undone.`
+            : "Your unsaved changes will be lost."
+        }
+        confirmLabel={confirmation === "delete" ? "Delete reminder" : "Discard changes"}
+        destructive
+        confirmDisabled={saving}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setConfirmation(null);
+        }}
+        onConfirm={() => {
+          if (confirmation === "delete") {
+            void deleteReminder();
+            return;
+          }
+          setConfirmation(null);
+          onOpenChange(false);
+        }}
+      />
+    </>
   );
 }
 
@@ -1127,21 +1239,27 @@ function SettingsModal({
   settings,
   onOpenChange,
   onSave,
+  onProviderTest,
   mutationsBlocked,
 }: {
   open: boolean;
   settings: SettingsRecord | null;
   onOpenChange: (open: boolean) => void;
   onSave: (settings: SettingsRecord) => Promise<void>;
+  onProviderTest: (channel: "email" | "telegram") => Promise<string>;
   mutationsBlocked: boolean;
 }) {
   const [draft, setDraft] = useState<SettingsRecord | null>(settings);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testing, setTesting] = useState<"email" | "telegram" | null>(null);
+  const [testStatus, setTestStatus] = useState<string | null>(null);
+  const [testToConfirm, setTestToConfirm] = useState<"email" | "telegram" | null>(null);
   useEffect(() => {
     if (open) {
       setDraft(settings);
       setError(null);
+      setTestStatus(null);
     }
   }, [open, settings]);
   const save = async (event: React.FormEvent) => {
@@ -1157,101 +1275,160 @@ function SettingsModal({
       setSaving(false);
     }
   };
+  const sendTest = async () => {
+    if (!testToConfirm) return;
+    const channel = testToConfirm;
+    setTestToConfirm(null);
+    setTesting(channel);
+    setError(null);
+    setTestStatus(null);
+    try {
+      setTestStatus(await onProviderTest(channel));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not send the test message.");
+    } finally {
+      setTesting(null);
+    }
+  };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>
-            These choices affect how dates are displayed and which channels are available by
-            default. They never change an existing reminder’s recurrence calendar or currency.
-          </DialogDescription>
-        </DialogHeader>
-        {draft && (
-          <form className="form-grid" onSubmit={save}>
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-            <label className="field field--wide">
-              Display calendar
-              <select
-                value={draft.calendarSystem}
-                onChange={(event) =>
-                  setDraft({ ...draft, calendarSystem: event.target.value as CalendarSystem })
-                }
-              >
-                <option value="gregorian">Gregorian</option>
-                <option value="jalali">Solar Hijri (Jalali)</option>
-              </select>
-            </label>
-            <label className="field field--wide">
-              Default currency
-              <select
-                value={draft.defaultCurrency}
-                onChange={(event) =>
-                  setDraft({ ...draft, defaultCurrency: event.target.value as Currency })
-                }
-              >
-                <option value="IRR">Iranian rial (IRR)</option>
-                <option value="USD">US dollar (USD)</option>
-              </select>
-            </label>
-            <fieldset className="field field--wide">
-              <legend>Notifications</legend>
-              <div className="settings-channel">
-                <div>
-                  <strong>Email</strong>
-                  <p>
-                    {draft.providers.email.available
-                      ? "Configured by the server"
-                      : "Not configured by the server"}
-                  </p>
-                </div>
-                <Switch
-                  checked={draft.emailEnabled}
-                  onCheckedChange={(value) => setDraft({ ...draft, emailEnabled: value })}
-                  disabled={!draft.providers.email.available}
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>
+              These choices affect how dates are displayed and which channels are available by
+              default. They never change an existing reminder’s recurrence calendar or currency.
+            </DialogDescription>
+          </DialogHeader>
+          {draft && (
+            <form className="form-grid" onSubmit={save}>
+              {error && (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              )}
+              <label className="field field--wide">
+                Display calendar
+                <Select
+                  aria-label="Display calendar"
+                  value={draft.calendarSystem}
+                  onValueChange={(value) =>
+                    setDraft({ ...draft, calendarSystem: value as CalendarSystem })
+                  }
+                  options={[
+                    { value: "gregorian", label: "Gregorian" },
+                    { value: "jalali", label: "Solar Hijri (Jalali)" },
+                  ]}
                 />
-              </div>
-              <div className="settings-channel">
-                <div>
-                  <strong>Telegram</strong>
-                  <p>
-                    {draft.providers.telegram.available
-                      ? "Configured by the server"
-                      : "Not configured by the server"}
-                  </p>
-                </div>
-                <Switch
-                  checked={draft.telegramEnabled}
-                  onCheckedChange={(value) => setDraft({ ...draft, telegramEnabled: value })}
-                  disabled={!draft.providers.telegram.available}
+              </label>
+              <label className="field field--wide">
+                Default currency
+                <Select
+                  aria-label="Default currency"
+                  value={draft.defaultCurrency}
+                  onValueChange={(value) =>
+                    setDraft({ ...draft, defaultCurrency: value as Currency })
+                  }
+                  options={[
+                    { value: "IRR", label: "Iranian rial (IRR)" },
+                    { value: "USD", label: "US dollar (USD)" },
+                  ]}
                 />
-              </div>
-            </fieldset>
-            <p className="provider-note">
-              <SlidersHorizontal aria-hidden="true" size={17} />
-              Provider test messages become available with the notification worker in Phase 4.
-            </p>
-            <DialogFooter>
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={() => onOpenChange(false)}
-                disabled={saving}
-              >
-                Cancel
-              </Button>
-              <Button variant="primary" type="submit" disabled={saving || mutationsBlocked}>
-                {saving && <LoaderCircle className="spin" aria-hidden="true" size={17} />}Save
-                settings
-              </Button>
-            </DialogFooter>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
+              </label>
+              <fieldset className="field field--wide">
+                <legend>Notifications</legend>
+                <div className="settings-channel">
+                  <div>
+                    <strong>Email</strong>
+                    <p>
+                      {draft.providers.email.available
+                        ? "Configured by the server"
+                        : "Not configured by the server"}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={draft.emailEnabled}
+                    onCheckedChange={(value) => setDraft({ ...draft, emailEnabled: value })}
+                    disabled={!draft.providers.email.available}
+                  />
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setTestToConfirm("email")}
+                    disabled={
+                      !draft.providers.email.available || mutationsBlocked || testing !== null
+                    }
+                  >
+                    {testing === "email" && (
+                      <LoaderCircle className="spin" aria-hidden="true" size={16} />
+                    )}
+                    Send test
+                  </Button>
+                </div>
+                <div className="settings-channel">
+                  <div>
+                    <strong>Telegram</strong>
+                    <p>
+                      {draft.providers.telegram.available
+                        ? "Configured by the server"
+                        : "Not configured by the server"}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={draft.telegramEnabled}
+                    onCheckedChange={(value) => setDraft({ ...draft, telegramEnabled: value })}
+                    disabled={!draft.providers.telegram.available}
+                  />
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setTestToConfirm("telegram")}
+                    disabled={
+                      !draft.providers.telegram.available || mutationsBlocked || testing !== null
+                    }
+                  >
+                    {testing === "telegram" && (
+                      <LoaderCircle className="spin" aria-hidden="true" size={16} />
+                    )}
+                    Send test
+                  </Button>
+                </div>
+              </fieldset>
+              {testStatus && (
+                <p className="provider-note" role="status">
+                  {testStatus}
+                </p>
+              )}
+              <DialogFooter>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => onOpenChange(false)}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button variant="primary" type="submit" disabled={saving || mutationsBlocked}>
+                  {saving && <LoaderCircle className="spin" aria-hidden="true" size={17} />}Save
+                  settings
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      <ConfirmationModal
+        open={testToConfirm !== null}
+        title={`Send ${testToConfirm === "telegram" ? "Telegram" : "Email"} test?`}
+        description="A test message will be sent using the configured notification provider."
+        confirmLabel="Send test"
+        confirmDisabled={testing !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setTestToConfirm(null);
+        }}
+        onConfirm={() => void sendTest()}
+      />
+    </>
   );
 }

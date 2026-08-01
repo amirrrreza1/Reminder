@@ -66,6 +66,8 @@ Exit:
 
 ## Phase 4 — Notification worker
 
+Status: complete.
+
 - Scheduler advisory lock and bounded reminder pass.
 - Unique delivery insertion, cancellation, occurrence advancement, and one-time completion.
 - Queue claims with leases and `FOR UPDATE SKIP LOCKED`.

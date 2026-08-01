@@ -12,6 +12,7 @@ import {
 } from "@reminder/domain";
 import type { Sql, TransactionSql } from "postgres";
 
+import { NotFoundError, ProviderUnavailableError } from "./errors.js";
 import { createSql } from "./index.js";
 
 export type ProviderAvailability = Record<NotificationChannel, boolean>;
@@ -69,18 +70,11 @@ type ReminderRow = {
   updated_at: Date;
 };
 
-export class NotFoundError extends Error {}
 export class StaleWriteError extends Error {
   constructor(readonly current: ReminderRecord | SettingsRecord) {
     super("The resource has changed since it was loaded.");
   }
 }
-export class ProviderUnavailableError extends Error {
-  constructor(readonly channel: NotificationChannel) {
-    super(`${channel} is not configured by the server.`);
-  }
-}
-
 function iso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
@@ -152,6 +146,7 @@ export class ReminderRepository {
     private readonly timeZone: string,
     private readonly sendTime: string,
     private readonly availability: ProviderAvailability,
+    private readonly missedGraceHours = 72,
   ) {}
 
   private async withSql<T>(work: (sql: Sql) => Promise<T>): Promise<T> {
@@ -183,6 +178,43 @@ export class ReminderRepository {
     >`select ${sql.unsafe(returningReminder.replace("returning ", ""))} from reminders where id = ${id}`;
     if (!rows[0]) throw new NotFoundError("Reminder was not found.");
     return toRecord(rows[0]);
+  }
+
+  /** Inserts only an already-due occurrence; future rows are materialized by the scheduler. */
+  private async enqueueDueDeliveries(
+    tx: QueryClient,
+    reminder: ReminderRecord,
+    now: Date,
+  ): Promise<void> {
+    const scheduledFor = reminder.schedule.nextNotificationAt;
+    if (reminder.state !== "active" || !scheduledFor) return;
+    const scheduledAt = new Date(scheduledFor);
+    if (scheduledAt.getTime() > now.getTime()) return;
+    const settingsRows = await tx<
+      { email_enabled: boolean; telegram_enabled: boolean }[]
+    >`select email_enabled, telegram_enabled from settings where id = 1`;
+    const settings = settingsRows[0];
+    if (!settings || !reminder.schedule.nextOccurrenceDate) return;
+    const status =
+      now.getTime() - scheduledAt.getTime() <= this.missedGraceHours * 3_600_000
+        ? "pending"
+        : "expired";
+    for (const channel of ["email", "telegram"] as const) {
+      const globallyEnabled =
+        channel === "email" ? settings.email_enabled : settings.telegram_enabled;
+      if (!this.availability[channel] || !globallyEnabled || !reminder.channels[channel]) continue;
+      await tx`
+        insert into notification_deliveries (
+          reminder_id, kind, channel, occurrence_date, remind_before_days, scheduled_for,
+          status, next_attempt_at
+        ) values (
+          ${reminder.id}, 'occurrence', ${channel}, ${reminder.schedule.nextOccurrenceDate},
+          ${reminder.remindBeforeDays}, ${scheduledAt}, ${status}, ${
+            status === "pending" ? now : null
+          }
+        ) on conflict do nothing
+      `;
+    }
   }
 
   async create(input: CreateReminderInput, now = new Date()): Promise<ReminderRecord> {
@@ -221,7 +253,9 @@ export class ReminderRepository {
         ],
       );
       if (!rows[0]) throw new Error("Reminder insertion returned no row.");
-      return toRecord(rows[0]);
+      const record = toRecord(rows[0]);
+      await this.enqueueDueDeliveries(sql, record, now);
+      return record;
     });
   }
 
@@ -276,7 +310,9 @@ export class ReminderRepository {
         );
         if (!rows[0]) throw new NotFoundError("Reminder was not found.");
         await tx`update notification_deliveries set status = 'cancelled', next_attempt_at = null where reminder_id = ${id} and status in ('pending', 'retry')`;
-        return toRecord(rows[0]);
+        const record = toRecord(rows[0]);
+        await this.enqueueDueDeliveries(tx, record, now);
+        return record;
       }),
     );
   }

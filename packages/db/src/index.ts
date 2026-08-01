@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 
 export * from "./schema.js";
+export * from "./errors.js";
 export * from "./repository.js";
+export * from "./notifications.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = path.join(packageRoot, "migrations");

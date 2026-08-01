@@ -63,6 +63,109 @@
   border-color: transparent;
 }
 
+.ui-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  inline-size: 100%;
+  min-block-size: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: start;
+  cursor: pointer;
+  box-shadow: var(--shadow-control);
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.ui-select:hover:not(:disabled),
+.ui-select[data-state="open"] {
+  background: var(--color-warm-hover);
+}
+
+.ui-select[data-state="open"] {
+  transform: translate(-1px, -1px);
+}
+
+.ui-select:disabled {
+  cursor: not-allowed;
+  background: var(--color-disabled);
+  color: var(--color-ink-muted);
+  box-shadow: none;
+}
+
+.ui-select-icon {
+  display: inline-flex;
+  flex: none;
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.ui-select[data-state="open"] .ui-select-icon {
+  transform: rotate(180deg);
+}
+
+.ui-select-content {
+  z-index: 60;
+  overflow: hidden;
+  min-inline-size: var(--radix-select-trigger-width);
+  max-block-size: min(18rem, var(--radix-select-content-available-height));
+  border: var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-card);
+}
+
+.ui-select-viewport {
+  padding: var(--space-1);
+}
+
+.ui-select-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-block-size: 2.5rem;
+  padding: var(--space-2) 2.25rem var(--space-2) var(--space-3);
+  border-radius: calc(var(--radius-control) - 2px);
+  outline: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  user-select: none;
+  cursor: pointer;
+}
+
+.ui-select-item[data-state="checked"] {
+  background: var(--color-surface);
+  font-weight: 800;
+}
+
+.ui-select-item:hover,
+.ui-select-item[data-highlighted] {
+  background: var(--color-warm-hover);
+}
+
+.ui-select-item[data-disabled] {
+  cursor: not-allowed;
+  color: var(--color-ink-muted);
+}
+
+.ui-select-item-indicator {
+  position: absolute;
+  inset-inline-end: var(--space-3);
+  display: inline-flex;
+  color: var(--color-accent);
+}
+
 .ui-dialog-overlay {
   position: fixed;
   inset: 0;

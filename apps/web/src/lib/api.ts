@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 import { getConfig } from "@reminder/config";
 import {
   NotFoundError,
+  NotificationRepository,
   ProviderUnavailableError,
   ReminderRepository,
   StaleWriteError,
@@ -16,6 +17,7 @@ export function repository(): ReminderRepository {
     config.APP_TIMEZONE,
     config.NOTIFICATION_SEND_TIME,
     { email: config.smtpConfigured, telegram: config.telegramConfigured },
+    config.NOTIFICATION_MISSED_GRACE_HOURS,
   );
 }
 
@@ -31,6 +33,16 @@ export function providerStatus() {
       status: config.telegramConfigured ? "configured" : "not_configured",
     },
   } as const;
+}
+
+export function notificationRepository(): NotificationRepository {
+  const config = getConfig();
+  return new NotificationRepository(config.DATABASE_URL, {
+    timeZone: config.APP_TIMEZONE,
+    sendTime: config.NOTIFICATION_SEND_TIME,
+    missedGraceHours: config.NOTIFICATION_MISSED_GRACE_HOURS,
+    availability: { email: config.smtpConfigured, telegram: config.telegramConfigured },
+  });
 }
 
 export function noStore<T extends Response>(response: T): T {

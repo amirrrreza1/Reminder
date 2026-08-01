@@ -19,11 +19,13 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@reminder/domain": "workspace:*"
+    "@reminder/domain": "workspace:*",
+    "nodemailer": "9.0.3"
   },
   "devDependencies": {
     "@reminder/eslint-config": "workspace:*",
     "@reminder/typescript-config": "workspace:*",
+    "@types/nodemailer": "6.4.20",
     "eslint": "^9.32.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.9.2"
