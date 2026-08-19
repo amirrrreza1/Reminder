@@ -10,6 +10,10 @@
   "scripts": {
     "dev": "pnpm --filter @reminder/web dev",
     "dev:worker": "pnpm --filter @reminder/worker dev",
+    "dev:db": "docker compose -f compose.yaml -f compose.dev.yaml up -d db",
+    "dev:db:stop": "docker compose -f compose.yaml -f compose.dev.yaml stop db",
+    "dev:up": "pnpm dev:db && pnpm -r --filter=./packages/* build && pnpm db:migrate && pnpm dev:all",
+    "dev:all": "pnpm -r --parallel --if-present run dev",
     "build": "pnpm -r --filter=./packages/* build && pnpm --filter @reminder/web build && pnpm --filter @reminder/worker build",
     "start": "pnpm --filter @reminder/web start",
     "lint": "pnpm -r --if-present lint",

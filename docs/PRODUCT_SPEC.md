@@ -38,6 +38,7 @@ Reminder makes recurring obligations visible and dependable without becoming a c
 - CRUD for recurring reminders with a fast modal workflow.
 - Accurate next-occurrence calculation for Gregorian and Jalali calendars.
 - Optional amounts in IRR or USD.
+- Display conversion between IRR and USD via [Nerkh](https://nerkh.io/) when a token is configured.
 - Configurable lead time in whole days.
 - Durable, retryable email and Telegram delivery.
 - Responsive, accessible cards with a warm neo-brutalist visual language.
@@ -49,7 +50,7 @@ Reminder makes recurring obligations visible and dependable without becoming a c
 - Full calendar views, drag-and-drop scheduling, task lists, or note management.
 - SMS, mobile push, browser push, webhooks, or chat commands.
 - Attachments, contacts, tags, custom fields, or recurring checklists.
-- Exchange rates, currency conversion, payments, invoices, or financial accounting.
+- Payments, invoices, or financial accounting.
 - Multiple notification offsets per reminder.
 - Complex RFC 5545 rules such as “third business day” or arbitrary exclusion dates.
 - Native mobile applications.
@@ -93,7 +94,7 @@ Requirement IDs are stable references for issues, pull requests, tests, and rele
 - **DASH-005:** The toolbar searches title and description locally/server-side without a page navigation.
 - **DASH-006:** Filters cover type and state (`active`, `paused`, `all`). Sorting covers next occurrence, title, and amount.
 - **DASH-007:** Filters are represented in the URL query string and survive refresh.
-- **DASH-008:** Summary values include active reminder count and count due within seven days. Amount summary is shown separately by currency; currencies are never added together.
+- **DASH-008:** Summary values include active reminder count and count due within seven days. Amount summary is shown in the settings display currency. When `NERKH_API_TOKEN` is set, other currencies are converted using the live USD rate from [Nerkh](https://nerkh.io/). Without a token, currency is locked to `DEFAULT_CURRENCY` and the summary includes only amounts already stored in that currency.
 - **DASH-009:** The empty state explains the value of the app and offers one primary “Add reminder” action.
 - **DASH-010:** Loading uses stable skeleton cards; errors keep existing content when possible and offer retry.
 - **DASH-011:** A reminder due today says “Today”; a past-due one-time reminder says “Overdue”; future dates use an exact date plus relative countdown.
@@ -167,7 +168,7 @@ Changing a type updates defaults only for untouched fields during creation. It n
 
 - **SET-001:** Settings open in a modal from the dashboard header.
 - **SET-002:** Calendar system is exactly `Gregorian` or `Solar Hijri (Jalali)`.
-- **SET-003:** Currency is exactly `Iranian rial (IRR)` or `US dollar (USD)`.
+- **SET-003:** Currency is exactly `Iranian rial (IRR)` or `US dollar (USD)`. When `NERKH_API_TOKEN` is unset, the control is locked to `DEFAULT_CURRENCY`.
 - **SET-004:** Email enabled is a global boolean.
 - **SET-005:** Telegram enabled is a global boolean.
 - **SET-006:** A channel toggle is disabled and labeled “Not configured by the server” when required environment variables are missing or invalid.

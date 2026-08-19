@@ -12,4 +12,5 @@ export {
 export { Switch } from "./components/switch";
 export { Select, type SelectOption, type SelectProps } from "./components/select";
 export { Tooltip, TooltipProvider } from "./components/tooltip";
+export { ToastProvider, useToast, type ToastTone } from "./components/toast";
 export { cn } from "./lib/cn";

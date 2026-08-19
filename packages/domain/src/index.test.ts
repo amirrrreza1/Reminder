@@ -8,6 +8,8 @@ import {
   formatMoney,
   fromGregorian,
   parseMinorAmount,
+  parseUsdTomanRate,
+  convertMinorAmount,
   toGregorian,
   type CalendarDate,
   type GregorianDate,
@@ -88,5 +90,20 @@ describe("domain", () => {
     expect(() => parseMinorAmount("12.50")).toThrow();
     expect(formatMoney(1250n, "USD")).toBe("$12.50");
     expect(formatMoney(1_250_000n, "IRR")).toContain("1,250,000");
+  });
+
+  it("converts USD and IRR using a Nerkh toman-per-dollar rate", () => {
+    const usdToman = 81_088n;
+    expect(convertMinorAmount(1250n, "USD", "IRR", usdToman)).toBe(10_136_000n);
+    expect(convertMinorAmount(10_136_000n, "IRR", "USD", usdToman)).toBe(1250n);
+    expect(convertMinorAmount(1250n, "USD", "USD", usdToman)).toBe(1250n);
+  });
+
+  it("reads the USD current price from a Nerkh payload", () => {
+    expect(
+      parseUsdTomanRate({
+        data: { message: "Success", status: 200, prices: { current: "81088" } },
+      }),
+    ).toBe(81088n);
   });
 });

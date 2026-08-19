@@ -144,6 +144,15 @@
   cursor: pointer;
 }
 
+/* Items are focused programmatically as the user moves through the list, so the
+   global focus ring would flash a red outline on options. The highlighted and
+   checked backgrounds below already convey the state. */
+.ui-select-item:focus,
+.ui-select-item:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .ui-select-item[data-state="checked"] {
   background: var(--color-surface);
   font-weight: 800;
@@ -268,4 +277,65 @@
   font-size: 0.75rem;
   font-weight: 600;
   box-shadow: 2px 2px 0 var(--color-ink);
+}
+
+.ui-toaster {
+  position: fixed;
+  z-index: 80;
+  inset-block-end: var(--space-5);
+  inset-inline-end: var(--space-5);
+  display: grid;
+  gap: var(--space-3);
+  inline-size: min(24rem, calc(100vw - 2 * var(--space-5)));
+  pointer-events: none;
+}
+
+.ui-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.4;
+  box-shadow: var(--shadow-card);
+}
+
+.ui-toast p {
+  margin: 0;
+  flex: 1;
+}
+
+.ui-toast--error {
+  border-color: var(--color-accent);
+}
+
+.ui-toast--success {
+  border-color: var(--color-success);
+}
+
+.ui-toast-dismiss {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  margin: 0;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ui-toast-dismiss:focus-visible {
+  outline: 3px solid var(--color-focus, var(--color-accent));
+  outline-offset: 2px;
 }

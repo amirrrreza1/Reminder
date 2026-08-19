@@ -224,7 +224,7 @@ The immutable numeric anchor prevents a clamped occurrence from becoming the new
 
 Parsing accepts localized grouping separators at the UI boundary but produces a validated integer before persistence. The API transports money as a string minor-unit value to avoid JavaScript unsafe-integer and floating-point errors.
 
-Changing the default currency affects new reminder forms only. There is no rate table and no conversion.
+Changing the default currency affects new reminder forms and dashboard display. Stored amounts keep their original currency. When `NERKH_API_TOKEN` is set, the dashboard converts amounts to the selected currency using the live USD rate from [Nerkh](https://nerkh.io/). Without a token, Settings currency is locked to `DEFAULT_CURRENCY`.
 
 ## 8. `notification_deliveries`
 

@@ -1,0 +1,18 @@
+# Development overlay: Postgres in Docker, web + worker on the host with hot reload.
+#
+#   pnpm dev:up     # start db, build packages, migrate, run web + worker watchers
+#
+# Equivalent long form:
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d db
+#   pnpm dev:all
+#
+# Only the db service is meant to run from this overlay. The web/worker/migrate
+# services stay defined in compose.yaml for the production stack; starting them
+# here would fight the host processes over port 3000 and the same database.
+
+services:
+  db:
+    # Published so host processes can reach it. Root .env already points
+    # DATABASE_URL at localhost:5432 for this reason.
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"

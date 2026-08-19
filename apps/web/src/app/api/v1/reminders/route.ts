@@ -8,6 +8,7 @@ import {
 import { getConfig } from "@reminder/config";
 
 import { errorResponse, jsonBody, noStore, repository, requestErrorResponse } from "@/lib/api";
+import { loadDisplayRate, sumDisplayAmount, toDisplayAmount } from "@/lib/display-amount";
 
 export const dynamic = "force-dynamic";
 
@@ -65,13 +66,16 @@ export async function GET(request: Request) {
     if (requestedTypes.some((type) => !(reminderTypes as readonly string[]).includes(type)))
       return invalidQuery("type is invalid.");
     const allItems = await repository().list();
+    const { displayCurrency, usdToman } = await loadDisplayRate();
     const active = allItems.filter((item) => item.state === "active");
     const localToday = todayInTimezone(new Date(), getConfig().APP_TIMEZONE);
     const today = formatGregorianDate(localToday);
     const inSevenDays = formatGregorianDate(addGregorianDays(localToday, 7));
-    const amountsByCurrency = { IRR: 0n, USD: 0n };
-    for (const item of active)
-      if (item.amount) amountsByCurrency[item.amount.currency] += BigInt(item.amount.minor);
+    const displayAmount = sumDisplayAmount(
+      active.map((item) => item.amount),
+      displayCurrency,
+      usdToman,
+    );
     let items = allItems.filter(
       (item) =>
         (state === "all" || item.state === state) &&
@@ -86,7 +90,10 @@ export async function GET(request: Request) {
         sort === "title"
           ? left.title.localeCompare(right.title)
           : sort === "amount"
-            ? Number(BigInt(left.amount?.minor ?? "0") - BigInt(right.amount?.minor ?? "0"))
+            ? Number(
+                BigInt(toDisplayAmount(left.amount, displayCurrency, usdToman)?.minor ?? "0") -
+                  BigInt(toDisplayAmount(right.amount, displayCurrency, usdToman)?.minor ?? "0"),
+              )
             : (left.schedule.nextOccurrenceDate ?? "9999-12-31").localeCompare(
                 right.schedule.nextOccurrenceDate ?? "9999-12-31",
               );
@@ -104,7 +111,10 @@ export async function GET(request: Request) {
     const next = items.length > limit ? pageItems.at(-1) : undefined;
     return noStore(
       Response.json({
-        items: pageItems,
+        items: pageItems.map((item) => ({
+          ...item,
+          displayAmount: toDisplayAmount(item.amount, displayCurrency, usdToman),
+        })),
         page: {
           nextCursor: next
             ? Buffer.from(JSON.stringify({ id: next.id })).toString("base64url")
@@ -119,10 +129,7 @@ export async function GET(request: Request) {
               item.schedule.nextOccurrenceDate >= today &&
               item.schedule.nextOccurrenceDate <= inSevenDays,
           ).length,
-          amountsByCurrency: {
-            IRR: amountsByCurrency.IRR.toString(),
-            USD: amountsByCurrency.USD.toString(),
-          },
+          amount: displayAmount,
         },
       }),
     );

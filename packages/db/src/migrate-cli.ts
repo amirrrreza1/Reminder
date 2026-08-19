@@ -1,3 +1,6 @@
+// Must stay first: it populates process.env before any module reads it.
+import "./load-root-env.js";
+
 import { loadConfig } from "@reminder/config";
 
 import { ensureSettings, runMigrations } from "./index.js";

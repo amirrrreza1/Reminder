@@ -35,6 +35,14 @@ export function providerStatus() {
   } as const;
 }
 
+export function currencyConversionStatus() {
+  const config = getConfig();
+  return {
+    available: config.nerkhConfigured,
+    status: config.nerkhConfigured ? "configured" : "not_configured",
+  } as const;
+}
+
 export function notificationRepository(): NotificationRepository {
   const config = getConfig();
   return new NotificationRepository(config.DATABASE_URL, {

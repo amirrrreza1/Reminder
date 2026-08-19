@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+import { seedSession } from "./auth-helpers";
+
 const settings = {
   calendarSystem: "gregorian",
   defaultCurrency: "IRR",
@@ -11,6 +13,7 @@ const settings = {
     email: { available: true, status: "configured" },
     telegram: { available: false, status: "not_configured" },
   },
+  currencyConversion: { available: true, status: "configured" },
 };
 
 const reminder = {
@@ -28,6 +31,7 @@ const reminder = {
     nextOccurrenceDate: "2026-08-15",
   },
   amount: { currency: "IRR", minor: "1250000" },
+  displayAmount: { currency: "IRR", minor: "1250000" },
   remindBeforeDays: 2,
   channels: { email: true, telegram: false },
   updatedAt: "2026-07-30T10:00:00.000Z",
@@ -39,7 +43,7 @@ function list(items: (typeof reminder)[]) {
     summary: {
       activeCount: items.filter((item) => item.state === "active").length,
       dueWithinSevenDaysCount: 0,
-      amountsByCurrency: { IRR: "1250000", USD: "0" },
+      amount: { currency: "IRR", minor: "1250000" },
     },
   };
 }
@@ -87,6 +91,9 @@ async function mockApi(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
+  // Every route is behind the login gate now, so a session has to exist before the
+  // dashboard will render. auth.spec.ts covers the form itself.
+  await seedSession(page);
   await mockApi(page);
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Edit Internet subscription" })).toBeVisible();

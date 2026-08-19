@@ -113,6 +113,7 @@
   display: flex;
   grid-column: 2;
   grid-row: 1;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-3);
 }
@@ -165,6 +166,9 @@
 .search-field {
   display: flex;
   align-items: center;
+  /* The input carries the global :focus-visible ring from base.css, which paints
+     6px outside its border box. This gap keeps that ring clear of the icon. */
+  gap: var(--space-3);
   min-block-size: 2.75rem;
   padding-inline: var(--space-3);
   border: var(--border-strong);
@@ -177,7 +181,8 @@
   inline-size: 100%;
   border: 0;
   outline: 0;
-  padding-inline-start: var(--space-2);
+  /* No inline padding: the icon gap above must be outside the input's border box
+     so the focus ring has room, and padding would sit inside it. */
   background: transparent;
   color: inherit;
   font: inherit;
@@ -191,8 +196,9 @@
 }
 
 .reminder-card {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 4.5rem auto auto auto;
+  align-content: start;
   gap: var(--space-4);
   min-block-size: 18rem;
   padding: var(--space-5);
@@ -248,6 +254,9 @@
 .card-description {
   display: -webkit-box;
   overflow: hidden;
+  min-block-size: 4.5rem;
+  max-block-size: 4.5rem;
+  color: var(--color-ink-muted);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
@@ -277,6 +286,17 @@
   gap: var(--space-2);
   color: var(--color-ink-muted);
   font-size: 0.8125rem;
+}
+
+.card-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(7rem, auto);
+  align-items: baseline;
+  min-block-size: 1.25rem;
+}
+
+.card-amount {
+  text-align: end;
 }
 
 .card-meta span,
@@ -461,6 +481,119 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Login ------------------------------------------------------------------- */
+
+.login-shell {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--space-6) var(--space-4);
+}
+
+.login-card {
+  display: grid;
+  gap: var(--space-5);
+  inline-size: min(100%, 24rem);
+  padding: var(--space-6);
+  border: var(--border-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.login-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 3.25rem;
+  block-size: 3.25rem;
+  border: var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-accent);
+  color: #fff;
+  box-shadow: var(--shadow-control);
+}
+
+.login-heading {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.login-heading h1 {
+  font-size: 2rem;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.login-heading p {
+  color: var(--color-ink-muted);
+  font-size: 0.9375rem;
+}
+
+/* Mirrors .search-field: the border sits on the wrapper so the input and the
+   reveal button read as one control, and the gap keeps the global focus ring
+   from base.css clear of the icon. */
+.login-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: 2.75rem;
+  padding-inline: var(--space-3);
+  border: var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-control);
+}
+
+/* Specific enough to beat the shared `.field input` box, which would otherwise
+   draw a second border and shadow inside this wrapper. */
+.login-field .login-input input {
+  inline-size: 100%;
+  min-block-size: 2.75rem;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+  box-shadow: none;
+}
+
+.login-reveal {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.login-reveal:hover {
+  color: var(--color-ink);
+}
+
+.login-error {
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-strong);
+  border-radius: var(--radius-control);
+  background: #ffd9d1;
+  color: #741d10;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+/* The node stays mounted so assistive tech announces into the same live region;
+   without this the `display` above would defeat `hidden`. */
+.login-error[hidden] {
+  display: none;
 }
 
 @media (max-width: 640px) {

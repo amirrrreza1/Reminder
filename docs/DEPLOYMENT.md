@@ -113,12 +113,22 @@ Production SMTP must require encrypted transport and enforce certificate validat
 
 Create the bot through Telegram’s official [BotFather flow](https://core.telegram.org/bots/tutorial). A user must contact the bot first before it can send a private message. Treat the bot token like a password; never place it in screenshots, URLs shared with others, issues, or browser history.
 
+### Currency conversion (Nerkh)
+
+Dashboard amounts can be shown in a single currency. Conversion uses the Nerkh USD price endpoint and is display-only; stored reminder amounts are not rewritten.
+
+| Variable          | Required for conversion | Notes                                                                                          |
+| ----------------- | ----------------------- | ---------------------------------------------------------------------------------------------- |
+| `NERKH_API_TOKEN` | Yes                     | Issued at [nerkh.io](https://nerkh.io/). Sent as `Authorization: Bearer` to `api.nerkh.io`     |
+
+When the token is empty, Settings currency is locked to `DEFAULT_CURRENCY` and the user cannot change it. Get a token from [https://nerkh.io/](https://nerkh.io/).
+
 ### Initial defaults
 
 | Variable                   | Values                | Behavior                                    |
 | -------------------------- | --------------------- | ------------------------------------------- |
 | `DEFAULT_CALENDAR_SYSTEM`  | `gregorian`, `jalali` | Seeds a new settings row                    |
-| `DEFAULT_CURRENCY`         | `IRR`, `USD`          | Seeds a new settings row                    |
+| `DEFAULT_CURRENCY`         | `IRR`, `USD`          | Seeds a new settings row; also the locked currency when Nerkh is not configured |
 | `DEFAULT_EMAIL_ENABLED`    | boolean               | Can seed true only if SMTP is available     |
 | `DEFAULT_TELEGRAM_ENABLED` | boolean               | Can seed true only if Telegram is available |
 

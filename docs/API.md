@@ -73,6 +73,10 @@ All mutation routes enforce same-origin/CSRF policy, JSON content type, and a sm
       "status": "configured"
     }
   },
+  "currencyConversion": {
+    "available": false,
+    "status": "not_configured"
+  },
   "updatedAt": "2026-07-29T09:00:00.000Z"
 }
 ```
@@ -109,15 +113,17 @@ Success: `200 OK`
   "summary": {
     "activeCount": 0,
     "dueWithinSevenDaysCount": 0,
-    "amountsByCurrency": {
-      "IRR": "0",
-      "USD": "0"
+    "amount": {
+      "currency": "IRR",
+      "minor": "0"
     }
   }
 }
 ```
 
-The summary represents all active reminders and is intentionally unaffected by list search/filter controls. Amount currencies remain separate.
+The summary represents all active reminders and is intentionally unaffected by list search/filter controls. Amounts are shown in the settings display currency. When `NERKH_API_TOKEN` is set, the server converts stored USD/IRR values using the live USD rate from [Nerkh](https://nerkh.io/). Without a token, only amounts already stored in `DEFAULT_CURRENCY` are totaled, and Settings cannot change currency.
+
+Each list item includes the stored `amount` plus `displayAmount` in the display currency. Edit/create still read and write the stored `amount`.
 
 ### `POST /api/v1/reminders`
 
@@ -218,7 +224,8 @@ Rules:
 
 - A channel cannot be enabled globally when its provider configuration is unavailable.
 - Disabling a channel cancels its eligible pending/retry deliveries in the same transaction.
-- Calendar and currency changes do not update existing reminder anchors or currency values.
+- Calendar and currency changes do not update existing reminder anchors or stored currency values. Dashboard display may convert amounts when Nerkh is configured.
+- Without `NERKH_API_TOKEN`, `defaultCurrency` is forced to `DEFAULT_CURRENCY` and cannot be changed.
 - A stale update returns `409 STALE_WRITE`.
 
 ## 5. Provider test endpoints

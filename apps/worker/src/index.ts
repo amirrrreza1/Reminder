@@ -1,3 +1,5 @@
+import "./load-root-env.js";
+
 import { hostname } from "node:os";
 
 import { getConfig } from "@reminder/config";

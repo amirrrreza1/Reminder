@@ -140,7 +140,7 @@ Do not use masonry; stable rows make scanning and keyboard order predictable.
 
 ### Summary
 
-Use one concise line instead of a dashboard of analytics. Show “12 active · 3 due this week.” If amounts are shown, separate currencies: “IRR 95,000,000 · USD 25.98.” Do not imply totals are equivalent.
+Use one concise line instead of a dashboard of analytics. Show “12 active · 3 due this week.” Amounts are shown in the settings display currency after Nerkh conversion when a token is configured.
 
 ## 5. Reminder card
 
@@ -383,7 +383,7 @@ At narrow widths:
 - [ ] At most one red primary action exists per action group.
 - [ ] Hard shadows do not cause clipped content or horizontal page scrolling.
 - [ ] Exact dates remain visible next to relative countdowns.
-- [ ] IRR and USD are never visually combined.
+- [ ] Amounts are shown in one display currency; stored IRR and USD values are not mixed without conversion.
 - [ ] Paused, completed, overdue, today, and due-soon states have text labels.
 - [ ] All modal fields and errors are keyboard/screen-reader usable.
 - [ ] Channel-disabled states explain environment configuration safely.

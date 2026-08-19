@@ -25,8 +25,11 @@ import {
   DialogTitle,
   Select,
   Switch,
+  useToast,
 } from "@reminder/ui";
 import { createReminderSchema, reminderPresets } from "@reminder/domain";
+
+import { parseAmount } from "@/lib/amount";
 
 type CalendarSystem = "gregorian" | "jalali";
 type Currency = "IRR" | "USD";
@@ -60,6 +63,7 @@ type Reminder = {
     nextOccurrenceDate: string | null;
   };
   amount: { currency: Currency; minor: string } | null;
+  displayAmount?: { currency: Currency; minor: string } | null;
   remindBeforeDays: number;
   channels: { email: boolean; telegram: boolean };
   updatedAt: string;
@@ -73,6 +77,7 @@ type SettingsRecord = {
   telegramEnabled: boolean;
   updatedAt: string;
   providers: { email: Provider; telegram: Provider };
+  currencyConversion: Provider;
 };
 type ProviderTest = {
   id: string;
@@ -86,7 +91,7 @@ type ListResponse = {
   summary: {
     activeCount: number;
     dueWithinSevenDaysCount: number;
-    amountsByCurrency: { IRR: string; USD: string };
+    amount: { currency: Currency; minor: string };
   };
 };
 
@@ -196,6 +201,13 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { "content-type": "application/json", ...init?.headers },
   });
   if (response.status === 204) return undefined as T;
+  if (response.status === 401) {
+    // The session ended while the tab was open. A full navigation is used rather
+    // than the router so every other in-flight request is abandoned with it.
+    const here = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(`/login?next=${encodeURIComponent(here)}`);
+    throw new ApiError("Your session expired. Please sign in again.", "UNAUTHORIZED", null);
+  }
   const body: unknown = await response.json();
   if (!response.ok) {
     const error = apiError(body);
@@ -225,21 +237,6 @@ function amountForInput(amount: Reminder["amount"]): string {
   if (!amount) return "";
   if (amount.currency === "IRR") return amount.minor;
   return (Number(amount.minor) / 100).toFixed(2);
-}
-
-function parseAmount(
-  value: string,
-  currency: Currency,
-): { currency: Currency; minor: string } | null {
-  const clean = value.trim();
-  if (!clean) return null;
-  if (!/^\d+(?:\.\d{1,2})?$/.test(clean))
-    throw new Error("Enter a non-negative amount with no currency symbol.");
-  const [whole = "", fraction = ""] = clean.split(".");
-  const minor = currency === "USD" ? `${whole}${fraction.padEnd(2, "0")}` : whole;
-  if (BigInt(minor) > 9_999_999_999_999n)
-    throw new Error("Amount exceeds the maximum supported value.");
-  return { currency, minor };
 }
 
 function formatDate(iso: string | null, calendar: CalendarSystem): string {
@@ -325,6 +322,21 @@ function draftFromReminder(reminder: Reminder, settings: SettingsRecord | null):
   };
 }
 
+function channelAllowed(
+  settings: SettingsRecord | null,
+  channel: "email" | "telegram",
+): { allowed: boolean; hint: string | null } {
+  const available = settings?.providers[channel].available ?? false;
+  const globallyOn = channel === "email" ? settings?.emailEnabled : settings?.telegramEnabled;
+  if (!available) return { allowed: false, hint: "Not configured by the server" };
+  if (!globallyOn)
+    return {
+      allowed: false,
+      hint: `Enable ${channel === "email" ? "Email" : "Telegram"} in Settings to use it here.`,
+    };
+  return { allowed: true, hint: null };
+}
+
 function updateUrl(values: Record<string, string | null>) {
   const params = new URLSearchParams(window.location.search);
   for (const [key, value] of Object.entries(values)) {
@@ -336,6 +348,7 @@ function updateUrl(values: Record<string, string | null>) {
 }
 
 export function Dashboard() {
+  const { toast } = useToast();
   const [items, setItems] = useState<Reminder[]>([]);
   const [summary, setSummary] = useState<ListResponse["summary"] | null>(null);
   const [settings, setSettings] = useState<SettingsRecord | null>(null);
@@ -349,7 +362,6 @@ export function Dashboard() {
   const [sort, setSort] = useState("nextOccurrence");
   const [reminderModal, setReminderModal] = useState<Reminder | "new" | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [notice, setNotice] = useState("");
   const firstLoad = useRef(true);
 
   const load = useCallback(async () => {
@@ -372,11 +384,13 @@ export function Dashboard() {
         setOffline(true);
         setMutationsBlocked(true);
       }
-      setError(cause instanceof Error ? cause.message : "Could not load reminders.");
+      const message = cause instanceof Error ? cause.message : "Could not load reminders.";
+      setError(message);
+      toast(message);
     } finally {
       setLoading(false);
     }
-  }, [search, state, sort, type]);
+  }, [search, state, sort, type, toast]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -453,7 +467,7 @@ export function Dashboard() {
     else
       await request<Reminder>("/api/v1/reminders", { method: "POST", body: JSON.stringify(body) });
     setReminderModal(null);
-    setNotice(editing ? "Reminder updated." : "Reminder created.");
+    toast(editing ? "Reminder updated." : "Reminder created.", "success");
     await load();
   };
   const saveSettings = async (input: SettingsRecord) => {
@@ -472,7 +486,7 @@ export function Dashboard() {
       });
       setSettings(next);
       setSettingsOpen(false);
-      setNotice("Settings saved.");
+      toast("Settings saved.", "success");
       await load();
     } catch (cause) {
       if (isConnectionFailure(cause)) {
@@ -515,15 +529,9 @@ export function Dashboard() {
     setSettingsOpen(false);
     updateUrl({ modal: null });
   };
-
   return (
     <div className="app-shell">
       <main className="app-main">
-        {notice && (
-          <p className="sr-only" role="status">
-            {notice}
-          </p>
-        )}
         {offline && (
           <div className="status-banner">
             <CircleAlert aria-hidden="true" size={18} />
@@ -548,11 +556,7 @@ export function Dashboard() {
           />
           <Summary
             label="Amounts"
-            value={
-              summary
-                ? `${formatMoney({ currency: "IRR", minor: summary.amountsByCurrency.IRR })} · ${formatMoney({ currency: "USD", minor: summary.amountsByCurrency.USD })}`
-                : "—"
-            }
+            value={summary ? (formatMoney(summary.amount) ?? "—") : "—"}
             loading={loading}
           />
         </section>
@@ -674,7 +678,7 @@ export function Dashboard() {
         }}
         onDeleted={async () => {
           closeReminder();
-          setNotice("Reminder deleted.");
+          toast("Reminder deleted.", "success");
           await load();
         }}
       />
@@ -718,7 +722,8 @@ function ReminderCard({
   calendar: CalendarSystem;
   onEdit: () => void;
 }) {
-  const amount = formatMoney(reminder.amount);
+  const amount = formatMoney(reminder.displayAmount ?? reminder.amount);
+  const amountCurrency = (reminder.displayAmount ?? reminder.amount)?.currency;
   return (
     <article className="reminder-card">
       <div className="card-heading">
@@ -732,10 +737,12 @@ function ReminderCard({
         </div>
         <span className={`state-badge state-badge--${reminder.state}`}>{reminder.state}</span>
       </div>
-      {reminder.description && (
+      {reminder.description ? (
         <p className="card-description" title={reminder.description}>
           {reminder.description}
         </p>
+      ) : (
+        <p className="card-description" aria-hidden="true" />
       )}
       <div className="date-block">
         <CalendarDays aria-hidden="true" size={18} />
@@ -746,11 +753,9 @@ function ReminderCard({
       </div>
       <div className="card-meta">
         <span>{recurrenceLabel(reminder.schedule)}</span>
-        {amount && (
-          <span>
-            {amount} {reminder.amount?.currency}
-          </span>
-        )}
+        <span className="card-amount">
+          {amount ? `${amount} ${amountCurrency}` : ""}
+        </span>
       </div>
       <div className="card-footer">
         <div className="channel-list" aria-label="Notification channels">
@@ -838,11 +843,11 @@ function ReminderModal({
   mutationsBlocked: boolean;
   onConnectionFailure: () => void;
 }) {
+  const { toast } = useToast();
   const [draft, setDraft] = useState<Draft>(() => initialDraft(settings));
   const [initial, setInitial] = useState("");
   const [currentReminder, setCurrentReminder] = useState<Reminder | null>(reminder);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<Reminder | null>(null);
   const [preview, setPreview] = useState<SchedulePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -858,7 +863,6 @@ function ReminderModal({
     setDraft(next);
     setInitial(JSON.stringify(next));
     setCurrentReminder(reminder);
-    setError(null);
     setConflict(null);
     initialized.current = true;
   }, [open, reminder, settings]);
@@ -925,7 +929,6 @@ function ReminderModal({
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setSaving(true);
-    setError(null);
     try {
       await onSave(draft, currentReminder);
     } catch (cause) {
@@ -937,7 +940,8 @@ function ReminderModal({
             : null;
         if (latest) setConflict(latest);
       }
-      setError(cause instanceof Error ? cause.message : "Could not save reminder.");
+      const message = cause instanceof Error ? cause.message : "Could not save reminder.";
+      toast(message);
     } finally {
       setSaving(false);
     }
@@ -949,7 +953,6 @@ function ReminderModal({
     if (!currentReminder) return;
     setConfirmation(null);
     setSaving(true);
-    setError(null);
     try {
       await request(`/api/v1/reminders/${currentReminder.id}`, {
         method: "DELETE",
@@ -958,7 +961,8 @@ function ReminderModal({
       await onDeleted();
     } catch (cause) {
       if (isConnectionFailure(cause)) onConnectionFailure();
-      setError(cause instanceof Error ? cause.message : "Could not delete reminder.");
+      const message = cause instanceof Error ? cause.message : "Could not delete reminder.";
+      toast(message);
     } finally {
       setSaving(false);
     }
@@ -976,6 +980,8 @@ function ReminderModal({
       };
     });
   };
+  const emailChannel = channelAllowed(settings, "email");
+  const telegramChannel = channelAllowed(settings, "telegram");
   return (
     <>
       <Dialog open={open} onOpenChange={close}>
@@ -984,11 +990,6 @@ function ReminderModal({
             <DialogTitle>{currentReminder ? "Edit reminder" : "Add reminder"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={save} className="form-grid">
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
             {conflict && (
               <div className="form-error form-error--conflict" role="alert">
                 This reminder was changed elsewhere. Reload the latest version before saving.
@@ -1001,7 +1002,6 @@ function ReminderModal({
                     setDraft(next);
                     setInitial(JSON.stringify(next));
                     setConflict(null);
-                    setError(null);
                   }}
                 >
                   Reload latest
@@ -1110,12 +1110,7 @@ function ReminderModal({
             </p>
             {reminderPresets[draft.type].amountVisible && (
               <label className="field">
-                <span>
-                  Amount{" "}
-                  <span className="field-setting">
-                    ({currencyLabels[draft.currency]}, set in Settings)
-                  </span>
-                </span>
+                Amount
                 <input
                   inputMode="decimal"
                   value={draft.amount}
@@ -1159,23 +1154,19 @@ function ReminderModal({
                   <Switch
                     checked={draft.email}
                     onCheckedChange={(value) => change("email", value)}
-                    disabled={!settings?.providers.email.available}
+                    disabled={!emailChannel.allowed && !draft.email}
                   />
                   Email{" "}
-                  {!settings?.providers.email.available && (
-                    <small>Not configured by the server</small>
-                  )}
+                  {emailChannel.hint && <small>{emailChannel.hint}</small>}
                 </label>
                 <label>
                   <Switch
                     checked={draft.telegram}
                     onCheckedChange={(value) => change("telegram", value)}
-                    disabled={!settings?.providers.telegram.available}
+                    disabled={!telegramChannel.allowed && !draft.telegram}
                   />
                   Telegram{" "}
-                  {!settings?.providers.telegram.available && (
-                    <small>Not configured by the server</small>
-                  )}
+                  {telegramChannel.hint && <small>{telegramChannel.hint}</small>}
                 </label>
               </div>
             </fieldset>
@@ -1249,28 +1240,26 @@ function SettingsModal({
   onProviderTest: (channel: "email" | "telegram") => Promise<string>;
   mutationsBlocked: boolean;
 }) {
+  const { toast } = useToast();
   const [draft, setDraft] = useState<SettingsRecord | null>(settings);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState<"email" | "telegram" | null>(null);
-  const [testStatus, setTestStatus] = useState<string | null>(null);
   const [testToConfirm, setTestToConfirm] = useState<"email" | "telegram" | null>(null);
   useEffect(() => {
     if (open) {
       setDraft(settings);
-      setError(null);
-      setTestStatus(null);
+      setTestToConfirm(null);
     }
   }, [open, settings]);
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!draft) return;
     setSaving(true);
-    setError(null);
     try {
       await onSave(draft);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not save settings.");
+      const message = cause instanceof Error ? cause.message : "Could not save settings.";
+      toast(message);
     } finally {
       setSaving(false);
     }
@@ -1280,12 +1269,12 @@ function SettingsModal({
     const channel = testToConfirm;
     setTestToConfirm(null);
     setTesting(channel);
-    setError(null);
-    setTestStatus(null);
     try {
-      setTestStatus(await onProviderTest(channel));
+      const status = await onProviderTest(channel);
+      toast(status, "success");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not send the test message.");
+      const message = cause instanceof Error ? cause.message : "Could not send the test message.";
+      toast(message);
     } finally {
       setTesting(null);
     }
@@ -1293,21 +1282,12 @@ function SettingsModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Settings</DialogTitle>
-            <DialogDescription>
-              These choices affect how dates are displayed and which channels are available by
-              default. They never change an existing reminder’s recurrence calendar or currency.
-            </DialogDescription>
           </DialogHeader>
           {draft && (
             <form className="form-grid" onSubmit={save}>
-              {error && (
-                <p className="form-error" role="alert">
-                  {error}
-                </p>
-              )}
               <label className="field field--wide">
                 Display calendar
                 <Select
@@ -1327,25 +1307,37 @@ function SettingsModal({
                 <Select
                   aria-label="Default currency"
                   value={draft.defaultCurrency}
+                  disabled={!draft.currencyConversion.available}
                   onValueChange={(value) =>
                     setDraft({ ...draft, defaultCurrency: value as Currency })
                   }
-                  options={[
-                    { value: "IRR", label: "Iranian rial (IRR)" },
-                    { value: "USD", label: "US dollar (USD)" },
-                  ]}
+                  options={
+                    draft.currencyConversion.available
+                      ? [
+                          { value: "IRR", label: "Iranian rial (IRR)" },
+                          { value: "USD", label: "US dollar (USD)" },
+                        ]
+                      : [
+                          {
+                            value: draft.defaultCurrency,
+                            label: currencyLabels[draft.defaultCurrency],
+                          },
+                        ]
+                  }
                 />
+                {!draft.currencyConversion.available && (
+                  <span className="field-setting">
+                    Currency is locked to the server DEFAULT_CURRENCY because no Nerkh API token is
+                    configured.
+                  </span>
+                )}
               </label>
               <fieldset className="field field--wide">
                 <legend>Notifications</legend>
                 <div className="settings-channel">
                   <div>
                     <strong>Email</strong>
-                    <p>
-                      {draft.providers.email.available
-                        ? "Configured by the server"
-                        : "Not configured by the server"}
-                    </p>
+                    {!draft.providers.email.available && <p>Not configured by the server</p>}
                   </div>
                   <Switch
                     checked={draft.emailEnabled}
@@ -1369,11 +1361,7 @@ function SettingsModal({
                 <div className="settings-channel">
                   <div>
                     <strong>Telegram</strong>
-                    <p>
-                      {draft.providers.telegram.available
-                        ? "Configured by the server"
-                        : "Not configured by the server"}
-                    </p>
+                    {!draft.providers.telegram.available && <p>Not configured by the server</p>}
                   </div>
                   <Switch
                     checked={draft.telegramEnabled}
@@ -1395,11 +1383,6 @@ function SettingsModal({
                   </Button>
                 </div>
               </fieldset>
-              {testStatus && (
-                <p className="provider-note" role="status">
-                  {testStatus}
-                </p>
-              )}
               <DialogFooter>
                 <Button
                   variant="secondary"

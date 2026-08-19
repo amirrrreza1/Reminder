@@ -19,9 +19,10 @@ The schedule date and recurrence rule are required in addition to the original r
 
 ## Product surface
 
-1. **Dashboard** — reminder cards, compact filters, empty/loading/error states, and an add button.
-2. **Reminder modal** — title, description, type, date, recurrence, optional amount, lead time, notification channels, and active state.
-3. **Settings modal** — calendar system, default currency, email enabled, and Telegram enabled. Provider configuration remains in the environment.
+1. **Login** — a single password, set as `AUTH_PASSWORD` in the environment. There are no accounts and no registration.
+2. **Dashboard** — reminder cards, compact filters, empty/loading/error states, and an add button.
+3. **Reminder modal** — title, description, type, date, recurrence, optional amount, lead time, notification channels, and active state.
+4. **Settings modal** — calendar system, default currency, email enabled, and Telegram enabled. Provider configuration remains in the environment.
 
 There are no projects, teams, reports, social features, or notification inbox in the MVP. It is designed first for one person running one trusted instance.
 
@@ -63,6 +64,7 @@ corepack enable
 pnpm install --frozen-lockfile
 cp .env.example .env
 # Replace every CHANGE_ME value.
+# Optional: set NERKH_API_TOKEN from https://nerkh.io/ for dashboard currency conversion.
 docker compose up -d db
 pnpm db:migrate
 pnpm dev
@@ -114,6 +116,7 @@ Open `http://localhost:${APP_PORT}` only after `db`, `web`, and `worker` report 
 
 ## Important behavioral rules
 
+- `AUTH_PASSWORD` is the only credential. Every page and every `/api/v1/*` route requires a valid session; only `/api/health/*` is public. Changing the password signs out every browser, because the session cookie is signed with a key derived from it.
 - `APP_TIMEZONE` is authoritative for delivery time; timestamps are stored in UTC.
 - A reminder keeps the calendar system and currency used when it was created. Changing a global setting changes defaults and presentation, not historical meaning.
 - Email sends only when SMTP is configured, email is globally enabled, and the reminder has email enabled. Telegram follows the equivalent three-part rule.
